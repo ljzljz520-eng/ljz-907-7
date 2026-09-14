@@ -4,10 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DB_DIR = process.env.VLIB_DATA_DIR
+// 数据目录：数据库与会话密钥统一放这里（README「配置」一节的约定）
+const DATA_DIR = process.env.VLIB_DATA_DIR
   ? path.resolve(process.env.VLIB_DATA_DIR)
   : path.join(__dirname, '..', 'data');
-const DB_FILE = process.env.VLIB_DB_FILE || path.join(DB_DIR, 'library.db');
+const DB_FILE = process.env.VLIB_DB_FILE || path.join(DATA_DIR, 'library.db');
 const WASM_FILE = path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
 
 let db = null;
@@ -18,7 +19,7 @@ function persist(immediate = false) {
   if (!db) return;
   const doSave = () => {
     const data = db.export();
-    fs.mkdirSync(DB_DIR, { recursive: true });
+    fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(DB_FILE, Buffer.from(data));
   };
   if (immediate) {
@@ -168,4 +169,4 @@ function run(sql, params = []) {
   return { lastInsertRowid: db.exec('SELECT last_insert_rowid() AS id;')[0].values[0][0] };
 }
 
-module.exports = { getDb, all, get, run, persist };
+module.exports = { getDb, all, get, run, persist, DATA_DIR };

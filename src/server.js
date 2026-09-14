@@ -6,7 +6,7 @@ const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
 
-const { getDb, all, get, run, persist } = require('./db');
+const { getDb, all, get, run, persist, DATA_DIR } = require('./db');
 const { hashPassword, findUserByLogin, requireAuth, requireAdmin } = require('./auth');
 const { parseCsvObjects, toCsv } = require('./csv');
 
@@ -14,16 +14,17 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
-// ---- 会话密钥（持久化到文件，重启不掉登录） ----
-const dataDir = path.join(__dirname, '..', 'data');
+// ---- 会话密钥（持久化到数据目录，与数据库同处一地，重启不掉登录） ----
+const dataDir = DATA_DIR;
 fs.mkdirSync(dataDir, { recursive: true });
 const secretFile = path.join(dataDir, '.session-secret');
-let SECRET;
+let SECRET = '';
 if (fs.existsSync(secretFile)) {
-  SECRET = fs.readFileSync(secretFile, 'utf8');
-} else {
+  SECRET = fs.readFileSync(secretFile, 'utf8').trim();
+}
+if (!SECRET) {
   SECRET = crypto.randomBytes(32).toString('hex');
-  fs.writeFileSync(secretFile, SECRET);
+  fs.writeFileSync(secretFile, SECRET, { mode: 0o600 });
 }
 
 app.use(session({
@@ -128,11 +129,20 @@ function normalizeRow(raw, headerMap) {
   return out;
 }
 
+// 角色只认白名单精确值：admin/管理员 → admin；volunteer/志愿者/留空 → volunteer；
+// 其余任何值（如 notadmin、administrator）一律拒绝，绝不猜测提权。
+function parseRole(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (v === 'admin' || v === '管理员') return 'admin';
+  if (v === '' || v === 'volunteer' || v === '志愿者') return 'volunteer';
+  return null;
+}
+
 app.post('/api/admin/import/videos', requireAdmin, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: '未收到文件' });
   let rows;
   try { rows = parseCsvObjects(req.file.buffer.toString('utf8')); }
-  catch { return res.status(400).json({ error: 'CSV 解析失败，请检查文件格式' }); }
+  catch (e) { return res.status(400).json({ error: `CSV 解析失败：${e.message}` }); }
   if (!rows.length) return res.status(400).json({ error: 'CSV 没有数据行' });
 
   let inserted = 0, updated = 0;
@@ -165,7 +175,7 @@ app.post('/api/admin/import/users', requireAdmin, upload.single('file'), (req, r
   if (!req.file) return res.status(400).json({ error: '未收到文件' });
   let rows;
   try { rows = parseCsvObjects(req.file.buffer.toString('utf8')); }
-  catch { return res.status(400).json({ error: 'CSV 解析失败，请检查文件格式' }); }
+  catch (e) { return res.status(400).json({ error: `CSV 解析失败：${e.message}` }); }
   if (!rows.length) return res.status(400).json({ error: 'CSV 没有数据行' });
 
   let inserted = 0, updated = 0;
@@ -176,7 +186,10 @@ app.post('/api/admin/import/users', requireAdmin, upload.single('file'), (req, r
     if (!r.username || !r.real_name || !r.position) {
       errors.push({ line: lineNo, msg: '用户名、姓名、岗位为必填项' }); return;
     }
-    const role = /admin|管理员/i.test(r.role) ? 'admin' : 'volunteer';
+    const role = parseRole(r.role);
+    if (role === null) {
+      errors.push({ line: lineNo, msg: `角色值「${r.role}」无效，仅支持 admin/volunteer/管理员/志愿者` }); return;
+    }
     const existing = get('SELECT id FROM users WHERE username=?;', [r.username]);
     if (existing) {
       run('UPDATE users SET real_name=?, position=?, role=? WHERE username=?;',

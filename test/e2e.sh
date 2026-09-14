@@ -55,5 +55,21 @@ ok "$(echo "$S" | jget ".videos.find(v=>v.id===$VID).completed_count")" "1" "影
 echo "[5] 越权"
 ok "$(curl -s -o /dev/null -w '%{http_code}' -b $TMPD/z.jar $BASE/api/admin/users)" "403" "志愿者无法访问管理接口"
 
+echo "[6] 角色白名单与严格 CSV"
+printf '用户名,密码,姓名,岗位,角色\nhacker,vol123,黑客,导览服务,notadmin\n' > $TMPD/badrole.csv
+R=$(curl -s -b $TMPD/a.jar -F "file=@$TMPD/badrole.csv" $BASE/api/admin/import/users)
+ok "$(echo "$R" | jget ".inserted")" "0" "角色 notadmin 被拒绝（不授予 admin）"
+ok "$(echo "$R" | jget ".errors.length")" "1" "非法角色按行报错"
+ok "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"username":"hacker","password":"vol123"}' $BASE/api/auth/login)" "401" "被拒绝的账号不存在，无法登录"
+printf '用户名,密码,姓名,岗位,角色\nboss,admin456,钱主管,管理,管理员\n' > $TMPD/admin.csv
+R=$(curl -s -b $TMPD/a.jar -F "file=@$TMPD/admin.csv" $BASE/api/admin/import/users)
+ok "$(echo "$R" | jget ".inserted")" "1" "合法角色值 管理员 正常导入"
+ok "$(curl -s -H 'Content-Type: application/json' -d '{"username":"boss","password":"admin456"}' $BASE/api/auth/login | jget ".user.role")" "admin" "新管理员可登录且角色正确"
+printf '编号,片名,适用岗位\nV200,"未闭合,通用\n' > $TMPD/bad1.csv
+ok "$(curl -s -o /dev/null -w '%{http_code}' -b $TMPD/a.jar -F "file=@$TMPD/bad1.csv" $BASE/api/admin/import/videos)" "400" "引号未闭合的 CSV 返回 400"
+printf '编号,片名,适用岗位\nV201,只有两列\n' > $TMPD/bad2.csv
+ok "$(curl -s -o /dev/null -w '%{http_code}' -b $TMPD/a.jar -F "file=@$TMPD/bad2.csv" $BASE/api/admin/import/videos)" "400" "列数不齐的 CSV 返回 400"
+ok "$([ -f "$TMPD/.session-secret" ] && echo yes)" "yes" "会话密钥与数据库同目录（VLIB_DATA_DIR）"
+
 echo; echo "结果: $PASS 通过, $FAIL 失败"
 [ $FAIL -eq 0 ]
