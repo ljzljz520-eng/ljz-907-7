@@ -1,0 +1,25 @@
+{
+  "name": "volunteer-training-library",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "bash test/e2e.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "志愿者培训片库：管理员导入培训视频与考试提示，志愿者按岗位观看并反馈，后台按岗位统计完成情况",
+  "dependencies": {
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.3.0",
+    "sql.js": "^1.14.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>志愿者培训片库</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- 登录页 -->
+<div id="loginView" class="login-wrap">
+  <form class="login-card" id="loginForm">
+    <div class="logo">🎓</div>
+    <h1>志愿者培训片库</h1>
+    <p class="sub">按服务岗位学习必看培训片 · 完成反馈 · 考核留痕</p>
+    <div class="field"><label>用户名</label><input id="loginUser" autocomplete="username" required></div>
+    <div class="field"><label>密码</label><input id="loginPass" type="password" autocomplete="current-password" required></div>
+    <div id="loginErr" style="color:var(--red);font-size:13px;min-height:18px"></div>
+    <button class="btn block" type="submit">登 录</button>
+    <div class="hint-box">
+      演示账号：管理员 <b>admin / admin123</b><br>
+      志愿者 <b>zhangwei / vol123</b>（导览服务）、lina（签到引导）、wangfang（应急救护）、liuyang（后勤保障）
+    </div>
+  </form>
+</div>
+
+<!-- 主应用 -->
+<div id="appView" class="hidden">
+  <div class="topbar">
+    <div class="brand">🎓 志愿者培训片库</div>
+    <div class="who">
+      <span id="whoName"></span>
+      <span id="whoRole" class="badge-role"></span>
+      <button class="btn ghost sm" id="logoutBtn">退出</button>
+    </div>
+  </div>
+
+  <!-- 志愿者视图 -->
+  <div id="volView" class="container hidden">
+    <div class="progress-panel">
+      <div class="ring" id="progRing"><div id="progText">0%</div></div>
+      <div>
+        <h2 id="volTitle">我的必看片</h2>
+        <div class="meta" id="volMeta"></div>
+      </div>
+    </div>
+    <div id="videoList"></div>
+  </div>
+
+  <!-- 管理员视图 -->
+  <div id="adminView" class="container hidden">
+    <div class="tabs">
+      <button class="tab active" data-tab="stats">岗位完成统计</button>
+      <button class="tab" data-tab="videos">影片管理</button>
+      <button class="tab" data-tab="users">用户管理</button>
+      <button class="tab" data-tab="import">CSV 导入</button>
+      <button class="tab" data-tab="feedback">反馈明细</button>
+    </div>
+
+    <div id="tab-stats">
+      <div class="flex-between">
+        <h2 style="font-size:17px">按岗位统计完成情况</h2>
+        <select class="filter" id="statsPosition"></select>
+      </div>
+      <div class="stat-cards" id="statCards" style="margin-top:14px"></div>
+      <div class="section-title">每部必看片完成人数</div>
+      <div class="table-wrap"><table id="statsVideoTable">
+        <thead><tr><th>编号</th><th>片名</th><th>时长(分)</th><th class="num">完成人数</th><th>完成率</th></tr></thead>
+        <tbody></tbody></table></div>
+      <div class="section-title">志愿者完成进度</div>
+      <div class="table-wrap"><table id="statsUserTable">
+        <thead><tr><th>姓名</th><th>用户名</th><th class="num">已完成/必看</th><th>进度</th><th class="num">完成率</th></tr></thead>
+        <tbody></tbody></table></div>
+    </div>
+
+    <div id="tab-videos" class="hidden">
+      <div class="table-wrap"><table>
+        <thead><tr><th>编号</th><th>片名</th><th>岗位</th><th class="num">时长</th><th class="num">反馈数</th><th class="num">完成人数</th><th>考试提示</th></tr></thead>
+        <tbody id="videosTbody"></tbody></table></div>
+    </div>
+
+    <div id="tab-users" class="hidden">
+      <div class="table-wrap"><table>
+        <thead><tr><th>用户名</th><th>姓名</th><th>岗位</th><th>角色</th><th class="num">已完成/必看</th></tr></thead>
+        <tbody id="usersTbody"></tbody></table></div>
+    </div>
+
+    <div id="tab-import" class="hidden">
+      <div class="card">
+        <div class="section-title" style="margin-top:0">① 导入培训影片（含考试提示）</div>
+        <p class="muted">表头支持中文：编号, 片名, 适用岗位, 视频地址, 时长分钟, 考试提示, 简介。编号重复则更新原记录；“适用岗位”填 <b>通用</b> 表示全体志愿者必看。</p>
+        <div class="import-row">
+          <input type="file" id="videosFile" accept=".csv,text/csv">
+          <button class="btn sm" id="uploadVideos">上传导入</button>
+          <a class="btn ghost sm" href="/api/admin/template/videos">下载 CSV 模板</a>
+        </div>
+        <div class="import-result" id="videosResult"></div>
+      </div>
+      <div class="card">
+        <div class="section-title" style="margin-top:0">② 导入志愿者 / 用户</div>
+        <p class="muted">表头：用户名, 密码, 姓名, 岗位, 角色（volunteer/admin）。用户名重复则更新（密码列可留空表示不改密码）。</p>
+        <div class="import-row">
+          <input type="file" id="usersFile" accept=".csv,text/csv">
+          <button class="btn sm" id="uploadUsers">上传导入</button>
+          <a class="btn ghost sm" href="/api/admin/template/users">下载 CSV 模板</a>
+        </div>
+        <div class="import-result" id="usersResult"></div>
+      </div>
+    </div>
+
+    <div id="tab-feedback" class="hidden">
+      <div class="flex-between">
+        <div class="section-title" style="margin:0">全部观看反馈</div>
+        <select class="filter" id="feedbackVideo"><option value="">全部影片</option></select>
+      </div>
+      <div class="table-wrap" style="margin-top:10px"><table>
+        <thead><tr><th>影片</th><th>志愿者</th><th>岗位</th><th>是否完成</th><th class="num">评分</th><th>意见</th><th>更新时间</th></tr></thead>
+        <tbody id="feedbackTbody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>
